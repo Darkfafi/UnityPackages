@@ -6,9 +6,9 @@ namespace ModuleSystem
 {
 	public abstract class DelayedModuleBehaviourBase : ModuleBehaviourBase
 	{
-		public override bool TryProcess(ModuleAction action)
+		public override bool TryProcess(ModuleAction action, Action unlockAction)
 		{
-			return TryProcessInternal(action, Unlock);
+			return TryProcessInternal(action, unlockAction);
 		}
 
 		protected abstract bool TryProcessInternal(ModuleAction action, Action unlockMethod);
@@ -16,11 +16,11 @@ namespace ModuleSystem
 
 	public abstract class BasicModuleBehaviourBase : ModuleBehaviourBase
 	{
-		public override bool TryProcess(ModuleAction action)
+		public override bool TryProcess(ModuleAction action, Action unlockAction)
 		{
 			if (TryProcessInternal(action))
 			{
-				Unlock();
+				unlockAction();
 				return true;
 			}
 			return false;
@@ -43,16 +43,9 @@ namespace ModuleSystem.Core
 
 		public string UniqueIdentifier => string.Concat("ModuleBehaviour-UUID:", GetInstanceID());
 
-		public bool IsLocking => Processor != null && Processor.IsLockingModule(this);
-
 		#endregion
 
 		#region Public Methods
-
-		public void Unlock()
-		{
-			Processor.Unlock(this);
-		}
 
 		public virtual void Init(ModuleProcessor parent)
 		{
@@ -74,7 +67,7 @@ namespace ModuleSystem.Core
 
 		}
 
-		public abstract bool TryProcess(ModuleAction action);
+		public abstract bool TryProcess(ModuleAction action, Action unlockAction);
 
 		#endregion
 	}

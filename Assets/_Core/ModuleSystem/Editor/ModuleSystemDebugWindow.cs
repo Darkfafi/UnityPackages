@@ -287,7 +287,7 @@ namespace ModuleSystem.Editor
 
 			#region Private Methods
 
-			private void OnStackProcessed(ModuleAction coreAction)
+			private void OnStackProcessed(ModuleAction coreAction, uint layer)
 			{
 				_collectedCoreActions.Add(coreAction);
 			}
