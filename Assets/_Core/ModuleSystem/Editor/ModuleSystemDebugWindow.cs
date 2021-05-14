@@ -12,6 +12,7 @@ using System.Linq;
 
 namespace ModuleSystem.Editor
 {
+	[ExecuteInEditMode]
 	public class ModuleSystemDebugWindow : EditorWindow
 	{
 		#region Nested
@@ -49,10 +50,13 @@ namespace ModuleSystem.Editor
 
 		protected void Update()
 		{
-			if (_moduleProcessorTreeView != null && _moduleProcessorTreeView.HasTarget)
+			if (_moduleProcessorTreeView != null)
 			{
 				_moduleProcessorTreeView.RefreshTargetProcessor();
-				_moduleProcessorTreeView.Reload();
+				if(_moduleProcessorTreeView.HasTarget)
+				{
+					_moduleProcessorTreeView.Reload();
+				}
 				Repaint();
 			}
 		}
@@ -62,19 +66,18 @@ namespace ModuleSystem.Editor
 			if (_moduleProcessorTreeView == null)
 			{
 				_moduleProcessorTreeView = new ModuleProcessorView(new TreeViewState());
-				EditorSceneManager.sceneLoaded += OnSceneOpened;
+				EditorSceneManager.sceneLoaded += OnSceneLoaded;
 			}
 		}
 
 		protected void OnDisable()
 		{
 			_moduleProcessorTreeView = null;
-			EditorSceneManager.sceneLoaded -= OnSceneOpened;
+			EditorSceneManager.sceneLoaded -= OnSceneLoaded;
 		}
 
-		private void OnSceneOpened(Scene scene, LoadSceneMode mode)
+		private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
 		{
-			Debug.LogError("Hello");
 			if (!_moduleProcessorTreeView.HasTarget)
 			{
 				IHaveModuleProcessor[] processors = FindObjectsOfType<MonoBehaviour>().OfType<IHaveModuleProcessor>().ToArray();
@@ -178,6 +181,7 @@ namespace ModuleSystem.Editor
 			{
 				if(Target == null || Target.Processor != _targetProcessor)
 				{
+					_collectedCoreActions.Clear();
 					if (_targetProcessor != null)
 					{
 						_targetProcessor.ActionStackProcessedEvent -= OnStackProcessed;
@@ -204,7 +208,10 @@ namespace ModuleSystem.Editor
 					}
 
 					_collectedCoreActions.Clear();
+
 					Target = moduleProcessorHolder;
+
+					RefreshTargetProcessor();
 
 					multiColumnHeader.ResizeToFit();
 					Reload();
