@@ -117,28 +117,6 @@ namespace ModuleSystem
 			_marks.Clear();
 		}
 
-		public override string ToString()
-		{
-			StringBuilder sb = new StringBuilder();
-
-			sb.AppendLine("-- Marks --");
-			foreach (var pair in _marks)
-			{
-				foreach(var markSuffix in pair.Value)
-				{
-					sb.AppendLine(string.Format("{0}-{1}", pair.Key, markSuffix));
-				}
-			}
-
-			sb.AppendLine("-- Data --");
-			foreach (var pair in _dataMap)
-			{
-				sb.AppendLine(string.Format("{0}: {1}", pair.Key, pair.Value));
-			}
-
-			return sb.ToString();
-		}
-
 		#endregion
 
 		#region Internal Methods
