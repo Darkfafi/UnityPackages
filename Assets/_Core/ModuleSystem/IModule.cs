@@ -1,4 +1,6 @@
-﻿namespace ModuleSystem.Core
+﻿using System;
+
+namespace ModuleSystem.Core
 {
 	public interface IModule
 	{
@@ -7,7 +9,7 @@
 			get;
 		}
 
-		bool TryProcess(ModuleAction action);
+		bool TryProcess(ModuleAction action, Action unlockMethod);
 		void OnResolvedStack(ModuleAction coreAction);
 		void Init(ModuleProcessor parent);
 		void StartModule();

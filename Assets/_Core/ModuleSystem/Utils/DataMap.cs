@@ -114,28 +114,21 @@ namespace ModuleSystem
 		public void Dispose()
 		{
 			_dataMap.Clear();
+			_marks.Clear();
 		}
 
-		public override string ToString()
+		#endregion
+
+		#region Internal Methods
+
+		internal Dictionary<string, object> GetDataMap()
 		{
-			StringBuilder sb = new StringBuilder();
+			return _dataMap;
+		}
 
-			sb.AppendLine("-- Marks --");
-			foreach (var pair in _marks)
-			{
-				foreach(var markSuffix in pair.Value)
-				{
-					sb.AppendLine(string.Format("{0}-{1}", pair.Key, markSuffix));
-				}
-			}
-
-			sb.AppendLine("-- Data --");
-			foreach (var pair in _dataMap)
-			{
-				sb.AppendLine(string.Format("{0}: {1}", pair.Key, pair.Value));
-			}
-
-			return sb.ToString();
+		internal Dictionary<string, List<string>> GetMarks()
+		{
+			return _marks;
 		}
 
 		#endregion
