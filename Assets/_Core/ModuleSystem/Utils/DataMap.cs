@@ -114,6 +114,7 @@ namespace ModuleSystem
 		public void Dispose()
 		{
 			_dataMap.Clear();
+			_marks.Clear();
 		}
 
 		public override string ToString()

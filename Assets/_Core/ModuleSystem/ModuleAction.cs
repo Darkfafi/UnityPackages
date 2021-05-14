@@ -9,6 +9,7 @@ namespace ModuleSystem
 
 		public readonly string UniqueIdentifier;
 		private readonly List<ModuleAction> _chainedActions = new List<ModuleAction>();
+		private readonly List<ModuleAction> _enqueuedActions = new List<ModuleAction>();
 		private ModuleAction _cachedRoot = null;
 
 		#endregion
@@ -27,6 +28,8 @@ namespace ModuleSystem
 
 		public ModuleAction[] ChainedActions => _chainedActions.ToArray();
 
+		public ModuleAction[] EnqueuedActions => _enqueuedActions.ToArray();
+
 		#endregion
 
 		public ModuleAction()
@@ -36,6 +39,18 @@ namespace ModuleSystem
 		}
 
 		#region Public Methods
+
+		public void EnqueueAction(ModuleAction action)
+		{
+			if(action.Source != null)
+			{
+				action.Source._enqueuedActions.Remove(action);
+			}
+
+			action.Source = this;
+
+			_enqueuedActions.Add(action);
+		}
 
 		public void ChainAction(ModuleAction action)
 		{

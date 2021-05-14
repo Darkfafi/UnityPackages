@@ -10,6 +10,7 @@ namespace ModuleSystem
 
 		private const string ProcessedByModuleKey = "ProcessedByModule";
 		private const string ChainedByProcessorKey = "ChainedByProcessor";
+		private const string EnqueuedByProcessorKey = "EnqueuedByProcessor";
 
 		#endregion
 
@@ -46,6 +47,11 @@ namespace ModuleSystem
 			get; private set;
 		}
 
+		public bool IsProcessing
+		{
+			get; private set;
+		}
+
 		#endregion
 
 		public ModuleProcessor(ProcessorSettings settings, params IModule[] modules)
@@ -78,6 +84,14 @@ namespace ModuleSystem
 				{
 					module.StartModule();
 				}
+			}
+		}
+
+		public void RemoveModule(IModule module)
+		{
+			if(_modules.Remove(module))
+			{
+				module.Deinit();
 			}
 		}
 
@@ -129,11 +143,7 @@ namespace ModuleSystem
 
 		public void EnqueueAction(ModuleAction action, uint layer = 0)
 		{
-			if(!_processLayers.TryGetValue(layer, out ProcessLayer processLayer))
-			{
-				processLayer = new ProcessLayer(layer, this, OnActionProcessed, OnActionStackProcessed);
-			}
-			processLayer.EnqueueAction(action);
+			GetOrCreateLayer(layer).EnqueueAction(action);
 		}
 
 		public void SetDisabled(bool isDisabled)
@@ -155,11 +165,13 @@ namespace ModuleSystem
 
 			for (int i = _modules.Count - 1; i >= 0; i--)
 			{
-				_modules[i].Deinit();
+				RemoveModule(_modules[i]);
 			}
 
-			_modules = null;
+			_modules.Clear();
+
 			_started = false;
+			_modules = null;
 			_processLayers = null;
 		}
 
@@ -167,13 +179,13 @@ namespace ModuleSystem
 
 		#region Private Methods
 
-		private void ProcessAction(ModuleAction action, uint layer)
+		private ProcessLayer GetOrCreateLayer(uint layer)
 		{
 			if (!_processLayers.TryGetValue(layer, out ProcessLayer processLayer))
 			{
-				processLayer = new ProcessLayer(layer, this, OnActionProcessed, OnActionStackProcessed);
+				_processLayers[layer] = processLayer = new ProcessLayer(layer, this, OnActionProcessed, OnActionStackProcessed);
 			}
-			processLayer.ProcessAction(action);
+			return processLayer;
 		}
 
 		private void TryProcessStack()
@@ -192,6 +204,14 @@ namespace ModuleSystem
 		private void OnActionStackProcessed(ModuleAction moduleAction, uint layer)
 		{
 			ActionStackProcessedEvent?.Invoke(moduleAction, layer);
+
+			if (_processLayers.TryGetValue(layer, out ProcessLayer processLayer))
+			{
+				if(processLayer.IsProcessingLastAction)
+				{
+					_processLayers.Remove(layer);
+				}
+			}
 		}
 
 		#endregion
@@ -201,12 +221,10 @@ namespace ModuleSystem
 		public struct ProcessorSettings
 		{
 			public bool StartModules;
-			public uint ChainActionLayerOffset;
 
-			public ProcessorSettings(bool startModules, uint chainActionLayerOffset)
+			public ProcessorSettings(bool startModules)
 			{
 				StartModules = startModules;
-				ChainActionLayerOffset = chainActionLayerOffset;
 			}
 		}
 
@@ -220,7 +238,12 @@ namespace ModuleSystem
 			private IModule _lockingModule = null;
 
 			private ModuleAction _initialAction = null;
+
+			// Actions Chained / Enqueued by Action
 			private Stack<ModuleAction> _executionStack = new Stack<ModuleAction>();
+			private Queue<ModuleAction> _executionQueue = new Queue<ModuleAction>();
+
+			// Actions Enqueued to execute when execution stack / queue is completely processed
 			private Queue<ModuleAction> _nextActions = new Queue<ModuleAction>();
 
 			private ModuleActionHandler _actionProcessedCallback = null;
@@ -230,6 +253,7 @@ namespace ModuleSystem
 
 			#region Properties
 
+			public bool IsProcessingLastAction => IsProcessing && _nextActions.Count == 0;
 			public bool IsProcessing => _isProcessing || _lockingModule != null;
 
 			#endregion
@@ -243,21 +267,6 @@ namespace ModuleSystem
 			}
 
 			#region Public Methods
-
-			public void ProcessAction(ModuleAction action)
-			{
-				if (!_processor._started)
-				{
-					_executionStack.Push(action);
-					return;
-				}
-
-				if (!_processor.IsDisabled || IsProcessing)
-				{
-					_executionStack.Push(action);
-					TryProcessStack();
-				}
-			}
 
 			public void EnqueueAction(ModuleAction action)
 			{
@@ -283,10 +292,19 @@ namespace ModuleSystem
 
 				_isProcessing = true;
 
-				// If the stack is empty, but the queue is not, then place the first of the queue on top of the stack
-				if (_executionStack.Count == 0 && _nextActions.Count > 0)
+				// If the stack is empty
+				if(_executionStack.Count == 0)
 				{
-					_executionStack.Push(_nextActions.Dequeue());
+					// But the execution queue is not, then place the first of the queue on top of the stack
+					if (_executionQueue.Count > 0)
+					{
+						_executionStack.Push(_executionQueue.Dequeue());
+					}
+					//  But the queue is not, then place the first of the queue on top of the stack
+					else if (_nextActions.Count > 0)
+					{
+						_executionStack.Push(_nextActions.Dequeue());
+					}
 				}
 
 				// Stack Resolve Loop
@@ -328,6 +346,7 @@ namespace ModuleSystem
 								else
 								{
 									ChainActions(action);
+									EnqueueActions(action);
 
 									// If a new actions are on the stack, process those before finishing the processing of the source
 									if (_executionStack.Peek() != action)
@@ -348,6 +367,8 @@ namespace ModuleSystem
 
 					// After the action processing is done, check for chain reactions, if any are added, process them before closing this action
 					ChainActions(action);
+					EnqueueActions(action);
+
 					if (_executionStack.Peek() != action)
 					{
 						continue;
@@ -360,6 +381,14 @@ namespace ModuleSystem
 					// If the Stack is completely resolved
 					if (_executionStack.Count == 0)
 					{
+						// Process next in execution queue, causing the next stack flow on the execution stack
+						if (_executionQueue.Count > 0)
+						{
+							_executionStack.Push(_executionQueue.Dequeue());
+							// Continue for the 'stack' is not fully processed yet. For the Exeuction Queue is part of it.
+							continue;
+						}
+
 						if (_initialAction != null)
 						{
 							ModuleAction actionBase = _initialAction;
@@ -372,7 +401,7 @@ namespace ModuleSystem
 
 							_actionStackProcessedCallback?.Invoke(actionBase, _layer);
 						}
-
+						
 						// Process next in queue, causing the next stack flow on the execution stack
 						if (_nextActions.Count > 0)
 						{
@@ -387,11 +416,46 @@ namespace ModuleSystem
 			public void Dispose()
 			{
 				_nextActions.Clear();
+				_executionQueue.Clear();
 				_executionStack.Clear();
 
 				_lockingModule = null;
 				_initialAction = null;
 				_isProcessing = false;
+			}
+
+			#endregion
+
+			#region Internal Methods
+
+			internal void InternalStackProcessAction(ModuleAction action)
+			{
+				if (!_processor._started)
+				{
+					_executionStack.Push(action);
+					return;
+				}
+
+				if (!_processor.IsDisabled || IsProcessing)
+				{
+					_executionStack.Push(action);
+					TryProcessStack();
+				}
+			}
+
+			internal void InternalStackEnqueueAction(ModuleAction action)
+			{
+				if (!_processor._started)
+				{
+					_executionQueue.Enqueue(action);
+					return;
+				}
+
+				if (!_processor.IsDisabled || IsProcessing)
+				{
+					_executionQueue.Enqueue(action);
+					TryProcessStack();
+				}
 			}
 
 			#endregion
@@ -414,14 +478,28 @@ namespace ModuleSystem
 
 			private void ChainActions(ModuleAction source)
 			{
-				// Stack Chain Actions after source is processed completely
-				for (int i = source.ChainedActions.Length - 1; i >= 0; i--)
+				ModuleAction[] chainedActions = source.ChainedActions;
+				for (int i = chainedActions.Length - 1; i >= 0; i--)
 				{
-					ModuleAction chainedAction = source.ChainedActions[i];
+					ModuleAction chainedAction = chainedActions[i];
 					if (!chainedAction.DataMap.HasMark(ChainedByProcessorKey, _processor.UniqueIdentifier))
 					{
-						_processor.ProcessAction(chainedAction, _layer + _processor.Settings.ChainActionLayerOffset);
+						InternalStackProcessAction(chainedAction);
 						chainedAction.DataMap.Mark(ChainedByProcessorKey, _processor.UniqueIdentifier);
+					}
+				}
+			}
+
+			private void EnqueueActions(ModuleAction source)
+			{
+				ModuleAction[] enqueuedActions = source.EnqueuedActions;
+				for (int i = 0; i < enqueuedActions.Length; i++)
+				{
+					ModuleAction enqueuedAction = enqueuedActions[i];
+					if (!enqueuedAction.DataMap.HasMark(EnqueuedByProcessorKey, _processor.UniqueIdentifier))
+					{
+						InternalStackEnqueueAction(enqueuedAction);
+						enqueuedAction.DataMap.Mark(EnqueuedByProcessorKey, _processor.UniqueIdentifier);
 					}
 				}
 			}
