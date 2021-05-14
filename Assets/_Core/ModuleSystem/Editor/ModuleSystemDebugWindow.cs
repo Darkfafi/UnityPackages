@@ -242,10 +242,10 @@ namespace ModuleSystem.Editor
 								args.label = action.UniqueIdentifierString;
 								break;
 							case Headers.DataMap:
-								GUI.TextArea(cellRect, action.DataMapString);
+								EditorGUI.Popup(cellRect, 0, action.DataMapOptions);
 								continue;
 							case Headers.Fields:
-								GUI.TextArea(cellRect, action.FieldsString);
+								EditorGUI.Popup(cellRect, 0, action.FieldOptions);
 								continue;
 							case Headers.ProcessType:
 								args.label = action.ProcessTypeString;
@@ -351,42 +351,43 @@ namespace ModuleSystem.Editor
 				while (nextToConvert.Count > 0)
 				{
 					(ModuleAction convertingAction, ModuleActionData convertingData) = nextToConvert.Dequeue();
-					StringBuilder sb = new StringBuilder();
+					List<string> options = new List<string>();
 
-					sb.AppendLine("-- Marks --");
+					options.Add("-- Marks -- ");
 					foreach (var pair in convertingAction.DataMap.GetMarks())
 					{
 						foreach (var markSuffix in pair.Value)
 						{
-							sb.AppendLine(string.Format("{0}-{1}", pair.Key, markSuffix));
+							options.Add(string.Format("{0}-{1}", pair.Key, markSuffix));
 						}
 					}
 
-					sb.AppendLine("-- Data --");
+					options.Add("-- Data --");
 					foreach (var pair in convertingAction.DataMap.GetDataMap())
 					{
-						sb.AppendLine(string.Format("{0}: {1}", pair.Key, pair.Value));
+						options.Add(string.Format("{0}: {1}", pair.Key, pair.Value));
 					}
 
-					string dataMapString = sb.ToString();
+					string[] dataMapOptions = options.ToArray();
 
-					sb.Clear();
+					options.Clear();
 
 					FieldInfo[] infos = convertingAction.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+					options.Add("-- Fields --");
 					for (int j = 0; j < infos.Length; j++)
 					{
 						FieldInfo info = infos[j];
 						object val = info.GetValue(convertingAction);
 						string valString = val == null ? "NULL" : val.ToString();
-						sb.AppendLine(string.Format("{0}: {1}", info.Name, valString));
+						options.Add(string.Format("{0}: {1}", info.Name, valString));
 					}
 
-					string fieldsString = sb.ToString();
+					string[] fieldsOptions = options.ToArray();
 
 					convertingData.TypeString = convertingAction.GetType().Name;
 					convertingData.UniqueIdentifierString = convertingAction.UniqueIdentifier;
-					convertingData.DataMapString = dataMapString;
-					convertingData.FieldsString = fieldsString;
+					convertingData.DataMapOptions = dataMapOptions;
+					convertingData.FieldOptions = fieldsOptions;
 
 					// Chained Actions
 					ModuleAction[] chainedActions = convertingAction.ChainedActions;
@@ -425,8 +426,8 @@ namespace ModuleSystem.Editor
 			{
 				public string TypeString;
 				public string UniqueIdentifierString;
-				public string DataMapString;
-				public string FieldsString;
+				public string[] DataMapOptions;
+				public string[] FieldOptions;
 				public string ProcessTypeString;
 				public ModuleActionData[] ChainedActionsData;
 				public ModuleActionData[] EnqueuedActionsData;
