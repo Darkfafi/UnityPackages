@@ -141,6 +141,20 @@ namespace ModuleSystem
 
 		#endregion
 
+		#region Internal Methods
+
+		internal Dictionary<string, object> GetDataMap()
+		{
+			return _dataMap;
+		}
+
+		internal Dictionary<string, List<string>> GetMarks()
+		{
+			return _marks;
+		}
+
+		#endregion
+
 		#region Private Methods
 
 		private bool TrySetData(string key, object obj)

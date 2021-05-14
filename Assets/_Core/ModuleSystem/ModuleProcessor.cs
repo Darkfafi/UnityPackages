@@ -42,11 +42,6 @@ namespace ModuleSystem
 			get; private set;
 		}
 
-		public ProcessorSettings Settings
-		{
-			get; private set;
-		}
-
 		public bool IsProcessing
 		{
 			get; private set;
@@ -54,9 +49,8 @@ namespace ModuleSystem
 
 		#endregion
 
-		public ModuleProcessor(ProcessorSettings settings, params IModule[] modules)
+		public ModuleProcessor(bool startModules, params IModule[] modules)
 		{
-			Settings = settings;
 			UniqueIdentifier = Guid.NewGuid().ToString();
 			_started = false;
 			_modules = new List<IModule>(modules);
@@ -66,7 +60,7 @@ namespace ModuleSystem
 				_modules[i].Init(this);
 			}
 
-			if (Settings.StartModules)
+			if(startModules)
 			{
 				StartModules();
 			}
@@ -217,16 +211,6 @@ namespace ModuleSystem
 		#endregion
 
 		#region Nested
-
-		public struct ProcessorSettings
-		{
-			public bool StartModules;
-
-			public ProcessorSettings(bool startModules)
-			{
-				StartModules = startModules;
-			}
-		}
 
 		private class ProcessLayer : IDisposable
 		{
