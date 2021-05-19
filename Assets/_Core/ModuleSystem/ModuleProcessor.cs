@@ -8,6 +8,8 @@ namespace ModuleSystem
 	{
 		#region Consts
 
+		public const string DefaultLayer = "__Default__";
+
 		private const string ProcessedByModuleKey = "ProcessedByModule";
 		private const string ChainedByProcessorKey = "ChainedByProcessor";
 		private const string EnqueuedByProcessorKey = "EnqueuedByProcessor";
@@ -16,7 +18,7 @@ namespace ModuleSystem
 
 		#region Events
 
-		public delegate void ModuleActionHandler(ModuleAction moduleAction, uint layer);
+		public delegate void ModuleActionHandler(ModuleAction moduleAction, string layer);
 		public event ModuleActionHandler ActionProcessedEvent;
 		public event ModuleActionHandler ActionStackProcessedEvent;
 
@@ -24,7 +26,7 @@ namespace ModuleSystem
 
 		#region Variables
 
-		private Dictionary<uint, ProcessLayer> _processLayers = new Dictionary<uint, ProcessLayer>();
+		private Dictionary<string, ProcessLayer> _processLayers = new Dictionary<string, ProcessLayer>();
 		private List<IModule> _modules;
 		private bool _started = false;
 
@@ -135,8 +137,13 @@ namespace ModuleSystem
 			return _modules.ToArray();
 		}
 
-		public void EnqueueAction(ModuleAction action, uint layer = 0)
+		public void EnqueueAction(ModuleAction action, string layer = DefaultLayer)
 		{
+			if(string.IsNullOrEmpty(layer) || string.IsNullOrWhiteSpace(layer))
+			{
+				layer = DefaultLayer;
+			}
+
 			GetOrCreateLayer(layer).EnqueueAction(action);
 		}
 
@@ -173,7 +180,7 @@ namespace ModuleSystem
 
 		#region Private Methods
 
-		private ProcessLayer GetOrCreateLayer(uint layer)
+		private ProcessLayer GetOrCreateLayer(string layer)
 		{
 			if (!_processLayers.TryGetValue(layer, out ProcessLayer processLayer))
 			{
@@ -184,18 +191,19 @@ namespace ModuleSystem
 
 		private void TryProcessStack()
 		{
-			foreach (var pair in _processLayers)
+			Dictionary<string, ProcessLayer> cachedLayers = new Dictionary<string, ProcessLayer>(_processLayers);
+			foreach (var pair in cachedLayers)
 			{
 				pair.Value.TryProcessStack();
 			}
 		}
 
-		private void OnActionProcessed(ModuleAction moduleAction, uint layer)
+		private void OnActionProcessed(ModuleAction moduleAction, string layer)
 		{
 			ActionProcessedEvent?.Invoke(moduleAction, layer);
 		}
 
-		private void OnActionStackProcessed(ModuleAction moduleAction, uint layer)
+		private void OnActionStackProcessed(ModuleAction moduleAction, string layer)
 		{
 			ActionStackProcessedEvent?.Invoke(moduleAction, layer);
 
@@ -215,8 +223,6 @@ namespace ModuleSystem
 		private class ProcessLayer : IDisposable
 		{
 			#region Variables
-
-			private uint _layer = 0;
 			private ModuleProcessor _processor = null;
 			private bool _isProcessing = false;
 			private IModule _lockingModule = null;
@@ -237,14 +243,19 @@ namespace ModuleSystem
 
 			#region Properties
 
+			public string Layer
+			{
+				get; private set;
+			}
+
 			public bool IsProcessingLastAction => IsProcessing && _nextActions.Count == 0;
 			public bool IsProcessing => _isProcessing || _lockingModule != null;
 
 			#endregion
 
-			public ProcessLayer(uint layer, ModuleProcessor processor, ModuleActionHandler actionProcessedCallback, ModuleActionHandler actionStackProcessedCallback)
+			public ProcessLayer(string layer, ModuleProcessor processor, ModuleActionHandler actionProcessedCallback, ModuleActionHandler actionStackProcessedCallback)
 			{
-				_layer = layer;
+				Layer = layer;
 				_processor = processor;
 				_actionProcessedCallback = actionProcessedCallback;
 				_actionStackProcessedCallback = actionStackProcessedCallback;
@@ -360,7 +371,7 @@ namespace ModuleSystem
 
 					_executionStack.Pop();
 
-					_actionProcessedCallback?.Invoke(action, _layer);
+					_actionProcessedCallback?.Invoke(action, Layer);
 
 					// If the Stack is completely resolved
 					if (_executionStack.Count == 0)
@@ -383,7 +394,7 @@ namespace ModuleSystem
 								modules[i].OnResolvedStack(actionBase);
 							}
 
-							_actionStackProcessedCallback?.Invoke(actionBase, _layer);
+							_actionStackProcessedCallback?.Invoke(actionBase, Layer);
 						}
 						
 						// Process next in queue, causing the next stack flow on the execution stack
