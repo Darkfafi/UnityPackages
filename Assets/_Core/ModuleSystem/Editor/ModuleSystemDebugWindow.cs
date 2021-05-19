@@ -1,14 +1,13 @@
 ﻿using ModuleSystem.Core;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
-using UnityEngine;
-using System.Reflection;
-using System.Text;
-using System;
 using UnityEditor.SceneManagement;
+using UnityEngine;
 using UnityEngine.SceneManagement;
-using System.Linq;
 
 namespace ModuleSystem.Editor
 {
@@ -30,6 +29,9 @@ namespace ModuleSystem.Editor
 
 		#region Variables
 
+		[SerializeField]
+		private ModuleProcessorViewState _state = null;
+
 		private ModuleProcessorView _moduleProcessorTreeView;
 
 		#endregion
@@ -40,6 +42,7 @@ namespace ModuleSystem.Editor
 		static void OpenWindow()
 		{
 			ModuleSystemDebugWindow window = GetWindow<ModuleSystemDebugWindow>();
+
 			window.titleContent = new GUIContent("ModuleSystem TreeView");
 			window.Show();
 		}
@@ -50,77 +53,131 @@ namespace ModuleSystem.Editor
 
 		protected void Update()
 		{
-			if (_moduleProcessorTreeView != null)
+			if (_state.HasTarget)
 			{
-				_moduleProcessorTreeView.RefreshTargetProcessor();
-				if(_moduleProcessorTreeView.HasTarget)
+				_moduleProcessorTreeView.Reload();
+
+				// Refresh Update Logics
+				if(_state.IsRefreshed)
 				{
-					_moduleProcessorTreeView.Reload();
+					_moduleProcessorTreeView.multiColumnHeader.ResizeToFit();
+					_state.IsRefreshed = false;
 				}
-				Repaint();
 			}
+			Repaint();
 		}
 
 		protected void OnEnable()
 		{
 			if (_moduleProcessorTreeView == null)
 			{
-				_moduleProcessorTreeView = new ModuleProcessorView(new TreeViewState());
+				if(_state == null)
+				{
+					_state = new ModuleProcessorViewState();
+				}
+
+				_moduleProcessorTreeView = new ModuleProcessorView(_state);
 				EditorSceneManager.sceneLoaded += OnSceneLoaded;
+				_state.RefreshTarget();
 			}
 		}
 
 		protected void OnDisable()
 		{
-			_moduleProcessorTreeView = null;
-			EditorSceneManager.sceneLoaded -= OnSceneLoaded;
+			if (_moduleProcessorTreeView != null)
+			{
+				_moduleProcessorTreeView = null;
+				EditorSceneManager.sceneLoaded -= OnSceneLoaded;
+			}
 		}
 
-		private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+		private void OnSceneLoaded(Scene arg0, LoadSceneMode arg1)
 		{
-			if (!_moduleProcessorTreeView.HasTarget)
+			_state.RefreshTarget();
+		}
+
+		public void RefreshTarget()
+		{
+			if (_moduleProcessorTreeView == null)
+			{
+				if (_state == null)
+				{
+					_state = new ModuleProcessorViewState();
+				}
+
+				_moduleProcessorTreeView = new ModuleProcessorView(_state);
+			}
+
+			UnityEngine.Object activeObject = Selection.activeObject;
+
+			GameObject potentialTarget = _state.TargetContainer;
+
+			if (activeObject != null)
+			{
+				if (activeObject is GameObject gameObject)
+				{
+					potentialTarget = gameObject;
+				}
+			}
+
+			if (!_state.HasTarget)
+			{
+				_state.SetTargetContainer(potentialTarget, false);
+			}
+
+			if (!_state.HasTarget)
 			{
 				IHaveModuleProcessor[] processors = FindObjectsOfType<MonoBehaviour>().OfType<IHaveModuleProcessor>().ToArray();
 				if (processors.Length > 0)
 				{
-					_moduleProcessorTreeView.SetTarget(processors[0]);
+					_state.SetTargetContainer(((MonoBehaviour)processors[0]).gameObject, false);
 				}
 			}
-			_moduleProcessorTreeView.RefreshTargetProcessor();
+
+			if (_state.HasTarget)
+			{
+				if (_state.TargetContainer != null)
+				{
+					titleContent.text = $"Processor: {_state.TargetContainer.name}";
+				}
+				else
+				{
+					titleContent.text = "No Behaviour Processor";
+				}
+			}
+			else
+			{
+				titleContent.text = "No Processor";
+				EditorGUILayout.LabelField($"No Active {nameof(IHaveModuleProcessor)} Selected");
+			}
+		}
+
+		private void OnRefreshData()
+		{
+			if (_moduleProcessorTreeView != null)
+			{
+				_moduleProcessorTreeView.multiColumnHeader.ResizeToFit();
+			}
 		}
 
 		protected void OnGUI()
 		{
 			if (_moduleProcessorTreeView != null)
 			{
-				UnityEngine.Object activeObject = Selection.activeObject;
+				RefreshTarget();
 
-				IHaveModuleProcessor potentialTarget = null;
-				
-				if(activeObject != null)
+				GameObject go = _state.TargetContainer;
+
+				go = EditorGUILayout.ObjectField("Target: ", go, typeof(GameObject), true) as GameObject;
+
+				if (go != _state.TargetContainer)
 				{
-					if(activeObject is GameObject gameObject)
-					{
-						potentialTarget = gameObject.GetComponent<IHaveModuleProcessor>();
-					}
-					else
-					{
-						potentialTarget = activeObject as IHaveModuleProcessor;
-					}
+					_state.SetTargetContainer(go, false);
 				}
 
-				if (!_moduleProcessorTreeView.HasTarget || potentialTarget != _moduleProcessorTreeView.Target && potentialTarget != null)
+				if (_state.HasTarget)
 				{
-					_moduleProcessorTreeView.SetTarget(potentialTarget);
-				}
-
-				if (_moduleProcessorTreeView.HasTarget)
-				{
-					_moduleProcessorTreeView.OnGUI(new Rect(0, 0, position.width, position.height));
-				}
-				else
-				{
-					EditorGUILayout.LabelField($"No Active {nameof(IHaveModuleProcessor)} Selected");
+					_moduleProcessorTreeView.OnGUI(new Rect(0, 25, position.width, position.height));
 				}
 			}
 		}
@@ -129,221 +186,79 @@ namespace ModuleSystem.Editor
 
 		#region Nested
 
-		private class ModuleProcessorView : TreeView
+		[Serializable]
+		private class ModuleProcessorViewState : TreeViewState
 		{
-			#region Variables
+			[SerializeField]
+			private GameObject _targetContainer;
 
 			private List<ModuleActionData> _collectedCoreActions = new List<ModuleActionData>();
-			private Dictionary<int, ModuleActionData> _idToAction = new Dictionary<int, ModuleActionData>();
 
-			#endregion
-
-			#region Properties
+			public GameObject TargetContainer => _targetContainer;
 
 			public bool HasTarget => Target != null;
 
-			public IHaveModuleProcessor Target
-			{
-				get; private set;
-			}
+			public IHaveModuleProcessor Target => _targetContainer != null ? _targetContainer.GetComponent<IHaveModuleProcessor>() : null;
 
-			private ModuleProcessor _targetProcessor = null;
-
-			#endregion
-
-			public static MultiColumnHeaderState.Column[] CreateColumnHeaders<T>() where T : Enum
-			{
-				Array e = Enum.GetValues(typeof(T));
-				MultiColumnHeaderState.Column[] headers = new MultiColumnHeaderState.Column[e.Length];
-				for (int i = 0; i < e.Length; i++)
-				{
-					headers[i] = new MultiColumnHeaderState.Column
-					{
-						headerContent = new GUIContent(e.GetValue(i).ToString()),
-						autoResize = true,
-					};
-				}
-				return headers;
-			}
-
-			public ModuleProcessorView(TreeViewState state)
-				: base(state, new MultiColumnHeader(new MultiColumnHeaderState(CreateColumnHeaders<Headers>())))
-			{
-				rowHeight = 20;
-				showAlternatingRowBackgrounds = true;
-				showBorder = true;
-				Reload();
-			}
+			public bool IsRefreshed = false;
 
 			#region Public Methods
 
-			public void RefreshTargetProcessor()
+			public ModuleActionData[] GetCoreActions()
 			{
-				if(Target == null || Target.Processor != _targetProcessor)
-				{
-					_collectedCoreActions.Clear();
-					if (_targetProcessor != null)
-					{
-						_targetProcessor.ActionStackProcessedEvent -= OnStackProcessed;
-					}
-
-					_targetProcessor = Target?.Processor;
-
-					if (_targetProcessor != null)
-					{
-						_targetProcessor.ActionStackProcessedEvent += OnStackProcessed;
-					}
-				}
-
+				return GetCollectedCoreActionsList().ToArray();
 			}
 
-			public void SetTarget(IHaveModuleProcessor moduleProcessorHolder)
+			public void RemoveAction(ModuleActionData data)
 			{
-				if(Target != moduleProcessorHolder)
-				{
-					if (_targetProcessor != null)
-					{
-						_targetProcessor.ActionStackProcessedEvent -= OnStackProcessed;
-						_targetProcessor = null;
-					}
-
-					_collectedCoreActions.Clear();
-
-					Target = moduleProcessorHolder;
-
-					RefreshTargetProcessor();
-
-					multiColumnHeader.ResizeToFit();
-					Reload();
-				}
+				GetCollectedCoreActionsList().Remove(data);
 			}
 
-			#endregion
-
-			#region Lifecycle
-
-			protected override void RowGUI(RowGUIArgs args)
+			public void RefreshTarget()
 			{
-				if (_idToAction.TryGetValue(args.item.id, out ModuleActionData action))
-				{
-					int numOfColumns = args.GetNumVisibleColumns();
-					for (int i = 0; i < numOfColumns; i++)
-					{
-						Headers column = (Headers)args.GetColumn(i);
-						Rect cellRect = args.GetCellRect(i);
-						args.rowRect = cellRect;
-						CenterRectUsingSingleLineHeight(ref cellRect);
-						cellRect.x += depthIndentWidth * args.item.depth;
+				SetTargetContainer(_targetContainer, true);
+			}
 
-						switch (column)
-						{
-							case Headers.Type:
-								args.label = action.TypeString;
-								break;
-							case Headers.Id:
-								args.label = action.UniqueIdentifierString;
-								break;
-							case Headers.DataMap:
-								EditorGUI.Popup(cellRect, 0, action.DataMapOptions);
-								continue;
-							case Headers.Fields:
-								EditorGUI.Popup(cellRect, 0, action.FieldOptions);
-								continue;
-							case Headers.ProcessType:
-								args.label = action.ProcessTypeString;
-								break;
-						}
-						base.RowGUI(args);
+			public void SetTargetContainer(GameObject targetContainer, bool force)
+			{
+				bool hasChange = _targetContainer != targetContainer;
+				if(targetContainer == null || hasChange || force)
+				{
+					if(Target != null)
+					{
+						Target.ActionStackProcessedEvent.RemoveListener(OnActionStackProcessedEvent);
+					}
+
+					if(!force)
+					{
+						GetCollectedCoreActionsList().Clear();
+					}
+
+					_targetContainer = targetContainer;
+
+					if (Target != null)
+					{
+						Target.ActionStackProcessedEvent.AddListener(OnActionStackProcessedEvent);
 					}
 				}
-				else
+				
+				if(hasChange)
 				{
-					base.RowGUI(args);
+					IsRefreshed = true;
 				}
 			}
 
-			public override void OnGUI(Rect rect)
+			private List<ModuleActionData> GetCollectedCoreActionsList()
 			{
-				base.OnGUI(rect);
-
-				Event e = Event.current;
-				if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Delete && HasSelection())
+				if(_collectedCoreActions == null)
 				{
-					foreach (var id in GetSelection())
-					{
-						if (_idToAction.TryGetValue(id, out ModuleActionData moduleAction))
-						{
-							_collectedCoreActions.Remove(moduleAction);
-						}
-					}
-
-					if (!HasTarget)
-					{
-						SetTarget(null);
-					}
+					_collectedCoreActions = new List<ModuleActionData>();
 				}
+
+				return _collectedCoreActions;
 			}
 
-			protected override TreeViewItem BuildRoot()
-			{
-				int id = 0;
-				_idToAction.Clear();
-
-				TreeViewItem root = CreateTreeViewItem(null);
-				root.depth = -1;
-
-				ModuleActionData[] coreActions = _collectedCoreActions.ToArray();
-				if (coreActions.Length > 0)
-				{
-					for (int i = 0; i < coreActions.Length; i++)
-					{
-						AddTreeItem(root, coreActions[i]);
-					}
-				}
-
-				if (root.children == null || root.children.Count == 0)
-				{
-					root.AddChild(CreateTreeViewItem(null, "N/A"));
-				}
-
-				SetupDepthsFromParentsAndChildren(root);
-
-				return root;
-
-				void AddTreeItem(TreeViewItem parentTreeItem, ModuleActionData moduleAction)
-				{
-					TreeViewItem treeItem = CreateTreeViewItem(moduleAction);
-					_idToAction.Add(id, moduleAction);
-					parentTreeItem.AddChild(treeItem);
-
-					ModuleActionData[] chainedChildren = moduleAction.ChainedActionsData;
-					for (int i = 0; i < chainedChildren.Length; i++)
-					{
-						AddTreeItem(treeItem, chainedChildren[i]);
-					}
-
-					ModuleActionData[] enqueuedChildren = moduleAction.EnqueuedActionsData;
-					for (int i = 0; i < enqueuedChildren.Length; i++)
-					{
-						AddTreeItem(treeItem, enqueuedChildren[i]);
-					}
-				}
-
-				TreeViewItem CreateTreeViewItem(ModuleActionData moduleAction, string fallbackName = "-")
-				{
-					return new TreeViewItem
-					{
-						id = ++id,
-						displayName = moduleAction != null ? moduleAction.UniqueIdentifierString : fallbackName,
-					};
-				}
-			}
-
-			#endregion
-
-			#region Private Methods
-
-			private void OnStackProcessed(ModuleAction coreAction, uint layer)
+			private void OnActionStackProcessedEvent(ModuleAction coreAction, string layer)
 			{
 				Queue<(ModuleAction, ModuleActionData)> nextToConvert = new Queue<(ModuleAction, ModuleActionData)>();
 				ModuleActionData coreActionData = new ModuleActionData();
@@ -394,7 +309,7 @@ namespace ModuleSystem.Editor
 					// Chained Actions
 					ModuleAction[] chainedActions = convertingAction.ChainedActions;
 					ModuleActionData[] chainedActionsData = new ModuleActionData[chainedActions.Length];
-					for(int i = 0; i < chainedActions.Length; i++)
+					for (int i = 0; i < chainedActions.Length; i++)
 					{
 						ModuleActionData actionData = new ModuleActionData();
 						nextToConvert.Enqueue((chainedActions[i], actionData));
@@ -416,15 +331,15 @@ namespace ModuleSystem.Editor
 					convertingData.EnqueuedActionsData = enqueuedActionsData;
 				}
 
-				_collectedCoreActions.Add(coreActionData);
+				GetCollectedCoreActionsList().Add(coreActionData);
+				IsRefreshed = true;
 			}
-
 
 			#endregion
 
 			#region Nested
 
-			private class ModuleActionData
+			public class ModuleActionData
 			{
 				public string TypeString;
 				public string UniqueIdentifierString;
@@ -433,6 +348,162 @@ namespace ModuleSystem.Editor
 				public string ProcessTypeString;
 				public ModuleActionData[] ChainedActionsData;
 				public ModuleActionData[] EnqueuedActionsData;
+			}
+
+			#endregion
+		}
+
+		private class ModuleProcessorView : TreeView
+		{
+			#region Variables
+
+			private Dictionary<int, ModuleProcessorViewState.ModuleActionData> _idToAction = new Dictionary<int, ModuleProcessorViewState.ModuleActionData>();
+
+			#endregion
+
+			#region Properties
+
+			private ModuleProcessorViewState _processorState = null;
+
+			#endregion
+
+			public static MultiColumnHeaderState.Column[] CreateColumnHeaders<T>() where T : Enum
+			{
+				Array e = Enum.GetValues(typeof(T));
+				MultiColumnHeaderState.Column[] headers = new MultiColumnHeaderState.Column[e.Length];
+				for (int i = 0; i < e.Length; i++)
+				{
+					headers[i] = new MultiColumnHeaderState.Column
+					{
+						headerContent = new GUIContent(e.GetValue(i).ToString()),
+						autoResize = true,
+					};
+				}
+				return headers;
+			}
+
+			public ModuleProcessorView(ModuleProcessorViewState state)
+				: base(state, new MultiColumnHeader(new MultiColumnHeaderState(CreateColumnHeaders<Headers>())))
+			{
+				_processorState = state;
+				rowHeight = 20;
+				showAlternatingRowBackgrounds = true;
+				showBorder = true;
+				Reload();
+			}
+
+			#region Lifecycle
+
+			protected override void RowGUI(RowGUIArgs args)
+			{
+				if (_idToAction.TryGetValue(args.item.id, out ModuleProcessorViewState.ModuleActionData action))
+				{
+					int numOfColumns = args.GetNumVisibleColumns();
+					for (int i = 0; i < numOfColumns; i++)
+					{
+						Headers column = (Headers)args.GetColumn(i);
+						Rect cellRect = args.GetCellRect(i);
+						args.rowRect = cellRect;
+						CenterRectUsingSingleLineHeight(ref cellRect);
+						cellRect.x += depthIndentWidth * args.item.depth;
+
+						switch (column)
+						{
+							case Headers.Type:
+								args.label = action.TypeString;
+								break;
+							case Headers.Id:
+								args.label = action.UniqueIdentifierString;
+								break;
+							case Headers.DataMap:
+								EditorGUI.Popup(cellRect, 0, action.DataMapOptions);
+								continue;
+							case Headers.Fields:
+								EditorGUI.Popup(cellRect, 0, action.FieldOptions);
+								continue;
+							case Headers.ProcessType:
+								args.label = action.ProcessTypeString;
+								break;
+						}
+						base.RowGUI(args);
+					}
+				}
+				else
+				{
+					base.RowGUI(args);
+				}
+			}
+
+			public override void OnGUI(Rect rect)
+			{
+				base.OnGUI(rect);
+
+				Event e = Event.current;
+				if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Delete && HasSelection())
+				{
+					foreach (var id in GetSelection())
+					{
+						if (_idToAction.TryGetValue(id, out ModuleProcessorViewState.ModuleActionData moduleAction))
+						{
+							_processorState.RemoveAction(moduleAction);
+						}
+					}
+				}
+			}
+
+			protected override TreeViewItem BuildRoot()
+			{
+				int id = 0;
+				_idToAction.Clear();
+
+				TreeViewItem root = CreateTreeViewItem(null);
+				root.depth = -1;
+
+				ModuleProcessorViewState.ModuleActionData[] coreActions = _processorState.GetCoreActions();
+				if (coreActions.Length > 0)
+				{
+					for (int i = 0; i < coreActions.Length; i++)
+					{
+						AddTreeItem(root, coreActions[i]);
+					}
+				}
+
+				if (root.children == null || root.children.Count == 0)
+				{
+					root.AddChild(CreateTreeViewItem(null, "N/A"));
+				}
+
+				SetupDepthsFromParentsAndChildren(root);
+
+				return root;
+
+				void AddTreeItem(TreeViewItem parentTreeItem, ModuleProcessorViewState.ModuleActionData moduleAction)
+				{
+					TreeViewItem treeItem = CreateTreeViewItem(moduleAction);
+					_idToAction.Add(id, moduleAction);
+					parentTreeItem.AddChild(treeItem);
+
+					ModuleProcessorViewState.ModuleActionData[] chainedChildren = moduleAction.ChainedActionsData;
+					for (int i = 0; i < chainedChildren.Length; i++)
+					{
+						AddTreeItem(treeItem, chainedChildren[i]);
+					}
+
+					ModuleProcessorViewState.ModuleActionData[] enqueuedChildren = moduleAction.EnqueuedActionsData;
+					for (int i = 0; i < enqueuedChildren.Length; i++)
+					{
+						AddTreeItem(treeItem, enqueuedChildren[i]);
+					}
+				}
+
+				TreeViewItem CreateTreeViewItem(ModuleProcessorViewState.ModuleActionData moduleAction, string fallbackName = "-")
+				{
+					return new TreeViewItem
+					{
+						id = ++id,
+						displayName = moduleAction != null ? moduleAction.UniqueIdentifierString : fallbackName,
+					};
+				}
 			}
 
 			#endregion
