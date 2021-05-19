@@ -14,7 +14,6 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 	protected void Awake()
 	{
 		Processor = new ModuleProcessor(true, 
-			
 			new BasicLambdaModule<MatchAction>((action, processor) => 
 			{
 				if(action.Iteration % 2 == 0)

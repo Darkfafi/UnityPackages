@@ -233,6 +233,8 @@ namespace ModuleSystem.Editor
 						Rect cellRect = args.GetCellRect(i);
 						args.rowRect = cellRect;
 						CenterRectUsingSingleLineHeight(ref cellRect);
+						cellRect.x += depthIndentWidth * args.item.depth;
+
 						switch (column)
 						{
 							case Headers.Type:
