@@ -139,6 +139,8 @@ namespace ModuleSystem
 
 		public void EnqueueAction(ModuleAction action, string layer = DefaultLayer)
 		{
+			UnityEngine.Debug.Log(layer +": " + action);
+
 			if(string.IsNullOrEmpty(layer) || string.IsNullOrWhiteSpace(layer))
 			{
 				layer = DefaultLayer;
@@ -222,7 +224,16 @@ namespace ModuleSystem
 
 		private class ProcessLayer : IDisposable
 		{
+			#region Consts
+
+			private const string ProcessedInLayerKey = "ProcessedInLayer";
+			private const string ChainedInLayerKey = "ChainedInLayer";
+			private const string EnqueuedInLayerKey = "EnqueuedInLayer";
+
+			#endregion
+
 			#region Variables
+
 			private ModuleProcessor _processor = null;
 			private bool _isProcessing = false;
 			private IModule _lockingModule = null;
@@ -333,6 +344,7 @@ namespace ModuleSystem
 							}))
 							{
 								action.DataMap.Mark(ProcessedByModuleKey, module.UniqueIdentifier);
+								action.DataMap.Mark(ProcessedInLayerKey, Layer);
 								if (_lockingModule != null)
 								{
 									_isProcessing = false;
@@ -481,6 +493,7 @@ namespace ModuleSystem
 					{
 						InternalStackProcessAction(chainedAction);
 						chainedAction.DataMap.Mark(ChainedByProcessorKey, _processor.UniqueIdentifier);
+						chainedAction.DataMap.Mark(ChainedInLayerKey, Layer);
 					}
 				}
 			}
@@ -495,6 +508,7 @@ namespace ModuleSystem
 					{
 						InternalStackEnqueueAction(enqueuedAction);
 						enqueuedAction.DataMap.Mark(EnqueuedByProcessorKey, _processor.UniqueIdentifier);
+						enqueuedAction.DataMap.Mark(EnqueuedInLayerKey, Layer);
 					}
 				}
 			}

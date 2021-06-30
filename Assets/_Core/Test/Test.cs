@@ -29,17 +29,9 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 	protected void Awake()
 	{
 		Processor = new ModuleProcessor(false, 
-			new BasicLambdaModule<MatchAction>((action, processor) => 
+			new BasicLambdaModule<MatchAction>((action, processor) =>
 			{
-				if(action.Iteration % 2 == 0)
-				{
-					action.EnqueueAction(new MatchAction());
-				}
-
-				for(int i = 0; i < action.Iteration * 2; i++)
-				{
-					action.ChainAction(new HitAction());
-				}
+				action.ChainAction(new HitAction());
 				return true;
 			}),
 			new BasicLambdaModule<HitAction>((action, processor) =>
@@ -54,7 +46,7 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 			})
 		);
 
-		for (int i = 0; i < 6; i++)
+		for (int i = 0; i < 1; i++)
 		{
 			Processor.EnqueueAction(new MatchAction() { Iteration = i });
 		}
@@ -94,11 +86,11 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 
 	public class HitAction : ModuleAction
 	{
-
+		public int Index;
 	}
 
 	public class RemoveAction : ModuleAction
 	{
-
+		public int Index;
 	}
 }

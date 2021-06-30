@@ -79,6 +79,7 @@ namespace ModuleSystem.Editor
 				_moduleProcessorTreeView = new ModuleProcessorView(_state);
 				EditorSceneManager.sceneLoaded += OnSceneLoaded;
 				_state.RefreshTarget();
+				_state.IsRefreshed = true;
 			}
 		}
 
@@ -106,32 +107,6 @@ namespace ModuleSystem.Editor
 				}
 
 				_moduleProcessorTreeView = new ModuleProcessorView(_state);
-			}
-
-			UnityEngine.Object activeObject = Selection.activeObject;
-
-			GameObject potentialTarget = _state.TargetContainer;
-
-			if (activeObject != null)
-			{
-				if (activeObject is GameObject gameObject)
-				{
-					potentialTarget = gameObject;
-				}
-			}
-
-			if (!_state.HasTarget)
-			{
-				_state.SetTargetContainer(potentialTarget, false);
-			}
-
-			if (!_state.HasTarget)
-			{
-				IHaveModuleProcessor[] processors = FindObjectsOfType<MonoBehaviour>().OfType<IHaveModuleProcessor>().ToArray();
-				if (processors.Length > 0)
-				{
-					_state.SetTargetContainer(((MonoBehaviour)processors[0]).gameObject, false);
-				}
 			}
 
 			if (_state.HasTarget)
@@ -166,9 +141,9 @@ namespace ModuleSystem.Editor
 			{
 				RefreshTarget();
 
-				GameObject go = _state.TargetContainer;
+				UnityEngine.Object go = _state.TargetContainer;
 
-				go = EditorGUILayout.ObjectField("Target: ", go, typeof(GameObject), true) as GameObject;
+				go = EditorGUILayout.ObjectField("Target: ", go, typeof(UnityEngine.Object), true) as UnityEngine.Object;
 
 				if (go != _state.TargetContainer)
 				{
@@ -190,15 +165,36 @@ namespace ModuleSystem.Editor
 		private class ModuleProcessorViewState : TreeViewState
 		{
 			[SerializeField]
-			private GameObject _targetContainer;
+			private UnityEngine.Object _targetContainer;
 
 			private List<ModuleActionData> _collectedCoreActions = new List<ModuleActionData>();
 
-			public GameObject TargetContainer => _targetContainer;
+			public UnityEngine.Object TargetContainer => _targetContainer;
 
 			public bool HasTarget => Target != null;
 
-			public IHaveModuleProcessor Target => _targetContainer != null ? _targetContainer.GetComponent<IHaveModuleProcessor>() : null;
+			public IHaveModuleProcessor Target 
+			{
+				get
+				{
+					if(_targetContainer == null)
+					{
+						return null;
+					}
+
+					if(_targetContainer is IHaveModuleProcessor haveModuleProcessor)
+					{
+						return haveModuleProcessor;
+					}
+
+					if(_targetContainer is GameObject gameObject)
+					{
+						return gameObject.GetComponent<IHaveModuleProcessor>();
+					}
+
+					return null;
+				}
+			}
 
 			public bool IsRefreshed = false;
 
@@ -219,7 +215,7 @@ namespace ModuleSystem.Editor
 				SetTargetContainer(_targetContainer, true);
 			}
 
-			public void SetTargetContainer(GameObject targetContainer, bool force)
+			public void SetTargetContainer(UnityEngine.Object targetContainer, bool force)
 			{
 				bool hasChange = _targetContainer != targetContainer;
 				if(targetContainer == null || hasChange || force)
