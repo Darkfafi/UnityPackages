@@ -1,25 +1,13 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using ModuleSystem;
+﻿using ModuleSystem;
 using ModuleSystem.Core;
-using ModuleSystem.Timeline;
-using System;
-using UnityEngine.Events;
+using UnityEngine;
 
-public class Test : MonoBehaviour, IHaveModuleProcessor
+public class Test : MonoBehaviour
 {
 	[SerializeField]
-	private ModuleTimelineProcessor _timelineProcessor = null;
+	private ActionStackProcessedEvent _actionStackProcessedEvent = null;
 
-	[SerializeField]
-	private ModuleProcessorEvent _actionProcessedEvent = null;
-
-	[SerializeField]
-	private ModuleProcessorEvent _actionStackProcessedEvent = null;
-
-	public ModuleProcessorEvent ActionProcessedEvent => _actionProcessedEvent;
-	public ModuleProcessorEvent ActionStackProcessedEvent => _actionStackProcessedEvent;
+	public ActionStackProcessedEvent ActionStackProcessedEvent => _actionStackProcessedEvent;
 
 	public ModuleProcessor Processor
 	{
@@ -28,12 +16,13 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 
 	protected void Awake()
 	{
-		Processor = new ModuleProcessor(false, 
-			new BasicLambdaModule<MatchAction>((action, processor) => 
+		Processor = new ModuleProcessor(false, new IModule[] 
+		{
+			new BasicLambdaModule<MatchAction>((action, processor) =>
 			{
 				if(action.Iteration % 2 == 0)
 				{
-					action.EnqueueAction(new MatchAction());
+					action.ChainAction(new MatchAction());
 				}
 
 				for(int i = 0; i < action.Iteration * 2; i++)
@@ -49,17 +38,15 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 			}),
 			new BasicLambdaModule<RemoveAction>((action, processor) =>
 			{
-				Debug.Log("Removed Tile");
 				return true;
 			})
-		);
+		});
 
-		for (int i = 0; i < 6; i++)
+		for (int i = 0; i < 100; i++)
 		{
 			Processor.EnqueueAction(new MatchAction() { Iteration = i });
 		}
 
-		Processor.ActionProcessedEvent += OnActionProcessedEvent;
 		Processor.ActionStackProcessedEvent += OnActionStackProcessedEvent;
 	}
 
@@ -70,21 +57,17 @@ public class Test : MonoBehaviour, IHaveModuleProcessor
 
 	protected void OnDestroy()
 	{
-		Processor.ActionProcessedEvent -= OnActionProcessedEvent;
-		Processor.ActionStackProcessedEvent -= OnActionStackProcessedEvent;
-		Processor.Dispose();
-		Processor = null;
+		if (Processor != null)
+		{
+			Processor.ActionStackProcessedEvent -= OnActionStackProcessedEvent;
+			Processor.Dispose();
+			Processor = null;
+		}
 	}
 
-	private void OnActionProcessedEvent(ModuleAction moduleAction, string layer)
+	private void OnActionStackProcessedEvent(ModuleAction moduleAction)
 	{
-		ActionProcessedEvent?.Invoke(moduleAction, layer);
-	}
-
-	private void OnActionStackProcessedEvent(ModuleAction moduleAction, string layer)
-	{
-		ActionStackProcessedEvent?.Invoke(moduleAction, layer);
-		_timelineProcessor.Visualize(moduleAction);
+		ActionStackProcessedEvent.Emit(moduleAction);
 	}
 
 	public class MatchAction : ModuleAction

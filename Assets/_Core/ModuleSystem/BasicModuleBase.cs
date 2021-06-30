@@ -5,9 +5,9 @@ namespace ModuleSystem
 {
 	public abstract class DelayedModuleBase : ModuleBase
 	{
-		public override bool TryProcess(ModuleAction action, Action unlockAction)
+		public override bool TryProcess(ModuleAction action, Action unlockMethod)
 		{
-			return TryProcessInternal(action, unlockAction);
+			return TryProcessInternal(action, unlockMethod);
 		}
 
 		protected abstract bool TryProcessInternal(ModuleAction action, Action unlockMethod);
@@ -15,9 +15,9 @@ namespace ModuleSystem
 
 	public abstract class DelayedModuleBase<T> : ModuleBase where T : ModuleAction
 	{
-		public override bool TryProcess(ModuleAction action, Action unlockAction)
+		public override bool TryProcess(ModuleAction action, Action unlockMethod)
 		{
-			return action is T castedAction && TryProcessInternal(castedAction, unlockAction);
+			return action is T castedAction && TryProcessInternal(castedAction, unlockMethod);
 		}
 
 		protected abstract bool TryProcessInternal(T action, Action unlockMethod);
@@ -25,11 +25,11 @@ namespace ModuleSystem
 
 	public abstract class BasicModuleBase : ModuleBase
 	{
-		public override bool TryProcess(ModuleAction action, Action unlockAction)
+		public override bool TryProcess(ModuleAction action, Action unlockMethod)
 		{
-			if(TryProcessInternal(action))
+			if (TryProcessInternal(action))
 			{
-				unlockAction();
+				unlockMethod();
 				return true;
 			}
 			return false;
@@ -40,11 +40,11 @@ namespace ModuleSystem
 
 	public abstract class BasicModuleBase<T> : ModuleBase where T : ModuleAction
 	{
-		public override bool TryProcess(ModuleAction action, Action unlockAction)
+		public override bool TryProcess(ModuleAction action, Action unlockMethod)
 		{
-			if(action is T castedAction && TryProcessInternal(castedAction))
+			if (action is T castedAction && TryProcessInternal(castedAction))
 			{
-				unlockAction();
+				unlockMethod();
 				return true;
 			}
 			return false;
@@ -68,9 +68,11 @@ namespace ModuleSystem.Core
 			get; private set;
 		}
 
+		public bool IsLocking => Processor.IsLockingModule(this);
+
 		public ModuleBase()
 		{
-			UniqueIdentifier = Guid.NewGuid().ToString();
+			UniqueIdentifier = "[" + GetType().Name + "]: " + Guid.NewGuid().ToString();
 		}
 
 		public virtual void Init(ModuleProcessor parent)
@@ -93,6 +95,6 @@ namespace ModuleSystem.Core
 
 		}
 
-		public abstract bool TryProcess(ModuleAction action, Action unlockAction);
+		public abstract bool TryProcess(ModuleAction action, Action unlockMethod);
 	}
 }

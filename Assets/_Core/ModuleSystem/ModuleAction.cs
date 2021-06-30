@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ModuleSystem.Core;
+using System;
 using System.Collections.Generic;
 
 namespace ModuleSystem
@@ -9,12 +10,17 @@ namespace ModuleSystem
 
 		public readonly string UniqueIdentifier;
 		private readonly List<ModuleAction> _chainedActions = new List<ModuleAction>();
-		private readonly List<ModuleAction> _enqueuedActions = new List<ModuleAction>();
-		private ModuleAction _cachedRoot = null;
+		private readonly HashSet<string> _processedByModulesList = new HashSet<string>();
+		private readonly HashSet<string> _chainedByProcessorList = new HashSet<string>();
 
 		#endregion
 
 		#region Properties
+
+		public ModuleAction Root
+		{
+			get; private set;
+		}
 
 		public ModuleAction Source
 		{
@@ -26,9 +32,7 @@ namespace ModuleSystem
 			get; private set;
 		}
 
-		public ModuleAction[] ChainedActions => _chainedActions.ToArray();
-
-		public ModuleAction[] EnqueuedActions => _enqueuedActions.ToArray();
+		public IReadOnlyList<ModuleAction> ChainedActions => _chainedActions;
 
 		#endregion
 
@@ -36,21 +40,10 @@ namespace ModuleSystem
 		{
 			UniqueIdentifier = Guid.NewGuid().ToString();
 			DataMap = new DataMap();
+			Root = this;
 		}
 
 		#region Public Methods
-
-		public void EnqueueAction(ModuleAction action)
-		{
-			if(action.Source != null)
-			{
-				action.Source._enqueuedActions.Remove(action);
-			}
-
-			action.Source = this;
-
-			_enqueuedActions.Add(action);
-		}
 
 		public void ChainAction(ModuleAction action)
 		{
@@ -60,6 +53,7 @@ namespace ModuleSystem
 			}
 
 			action.Source = this;
+			action.Root = Root;
 
 			_chainedActions.Add(action);
 		}
@@ -76,12 +70,12 @@ namespace ModuleSystem
 			ModuleAction source = Source;
 			while (source != null)
 			{
-				if(chainBlockade(source))
+				if (chainBlockade(source))
 				{
 					break;
 				}
 
-				if(source is T castedSource && predicate(castedSource))
+				if (source is T castedSource && predicate(castedSource))
 				{
 					result = castedSource;
 					return true;
@@ -111,10 +105,10 @@ namespace ModuleSystem
 		public bool TryFindDirectChainAction<T>(Predicate<T> predicate, out T result)
 		{
 			predicate = predicate ?? new Predicate<T>(x => true);
-			for(int i = 0; i < _chainedActions.Count; i++)
+			for (int i = 0; i < _chainedActions.Count; i++)
 			{
 				ModuleAction chainedAction = _chainedActions[i];
-				if(chainedAction is T castedChainedAction && predicate(castedChainedAction))
+				if (chainedAction is T castedChainedAction && predicate(castedChainedAction))
 				{
 					result = castedChainedAction;
 					return true;
@@ -124,6 +118,22 @@ namespace ModuleSystem
 			return false;
 		}
 
+		public T[] FindAllChained<T>(Predicate<T> predicate)
+			where T : ModuleAction
+		{
+			List<T> results = new List<T>();
+			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(_chainedActions);
+			predicate = predicate ?? new Predicate<T>(x => true);
+			for (int i = 0; i < _chainedActions.Count; i++)
+			{
+				if (_chainedActions[i] is T castedChainedAction && predicate(castedChainedAction))
+				{
+					results.Add(castedChainedAction);
+				}
+			}
+			return results.ToArray();
+		}
+
 		public bool HasDownwards<T>(Predicate<T> predicate, bool inclSelf)
 		{
 			return TryFindDownwards(predicate, null, inclSelf, out _);
@@ -131,11 +141,11 @@ namespace ModuleSystem
 
 		public bool TryFindDownwards<T>(Predicate<T> predicate, Predicate<ModuleAction> chainBlockade, bool inclSelf, out T result)
 		{
-			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(ChainedActions);
+			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(_chainedActions);
 			predicate = predicate ?? new Predicate<T>(x => true);
 			chainBlockade = chainBlockade ?? new Predicate<ModuleAction>(x => false);
 
-			if(inclSelf && this is T castedSelf && predicate(castedSelf))
+			if (inclSelf && this is T castedSelf && predicate(castedSelf))
 			{
 				result = castedSelf;
 				return true;
@@ -144,7 +154,7 @@ namespace ModuleSystem
 			while (chainedActions.Count > 0)
 			{
 				ModuleAction action = chainedActions.Dequeue();
-				if(action is T castedAction && predicate(castedAction))
+				if (action is T castedAction && predicate(castedAction))
 				{
 					result = castedAction;
 					return true;
@@ -152,9 +162,9 @@ namespace ModuleSystem
 
 				if (!chainBlockade(action))
 				{
-					for (int i = 0, c = action.ChainedActions.Length; i < c; i++)
+					for (int i = 0, c = action._chainedActions.Count; i < c; i++)
 					{
-						chainedActions.Enqueue(action.ChainedActions[i]);
+						chainedActions.Enqueue(action._chainedActions[i]);
 					}
 				}
 			}
@@ -166,7 +176,7 @@ namespace ModuleSystem
 			where T : ModuleAction
 		{
 			List<T> results = new List<T>();
-			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(ChainedActions);
+			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(_chainedActions);
 			predicate = predicate ?? new Predicate<T>(x => true);
 			chainBlockade = chainBlockade ?? new Predicate<ModuleAction>(x => false);
 
@@ -178,37 +188,51 @@ namespace ModuleSystem
 					results.Add(castedAction);
 				}
 
-				if(!chainBlockade(action))
+				if (!chainBlockade(action))
 				{
-					for (int i = 0, c = action.ChainedActions.Length; i < c; i++)
+					for (int i = 0, c = action._chainedActions.Count; i < c; i++)
 					{
-						chainedActions.Enqueue(action.ChainedActions[i]);
+						chainedActions.Enqueue(action._chainedActions[i]);
 					}
 				}
 			}
 			return results.ToArray();
 		}
 
-		public ModuleAction GetRoot()
+		public IReadOnlyCollection<string> GetProcessedByModulesList()
 		{
-			if(_cachedRoot != null)
-			{
-				return _cachedRoot;
-			}
-
-			ModuleAction root = this;
-			while(root.Source != null)
-			{
-				root = root.Source;
-			}
-			
-			if(root != this)
-			{
-				_cachedRoot = root;
-			}
-
-			return root;
+			return _processedByModulesList;
 		}
+
+		public IReadOnlyCollection<string> GetChainedByProcessorsList()
+		{
+			return _chainedByProcessorList;
+		}
+
+		#endregion
+
+		#region Internal Methods
+
+		internal bool IsProcessedByModule(IModule module)
+		{
+			return _processedByModulesList.Contains(module.UniqueIdentifier);
+		}
+
+		internal bool TryMarkProcessedByModule(IModule module)
+		{
+			return _processedByModulesList.Add(module.UniqueIdentifier);
+		}
+
+		internal bool IsChainedByProcessor(ModuleProcessor processor)
+		{
+			return _chainedByProcessorList.Contains(processor.UniqueIdentifier);
+		}
+
+		internal bool TryMarkChainedByProcessor(ModuleProcessor processor)
+		{
+			return _chainedByProcessorList.Add(processor.UniqueIdentifier);
+		}
+
 
 		#endregion
 	}

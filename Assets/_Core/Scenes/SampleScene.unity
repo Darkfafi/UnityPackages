@@ -160,6 +160,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eb78f81875d2dec4c9e5366947d220b1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _actionStackProcessedEvent: {fileID: 11400000, guid: 5440d880a44b18b4cbbbbbab4407e5ac,
+    type: 2}
 --- !u!20 &519420031
 Camera:
   m_ObjectHideFlags: 0

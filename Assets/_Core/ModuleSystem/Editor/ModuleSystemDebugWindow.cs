@@ -20,9 +20,10 @@ namespace ModuleSystem.Editor
 		{
 			Type = 0,
 			Id = 1,
-			DataMap = 2,
-			Fields = 3,
-			ProcessType = 4,
+			Processing = 2,
+			DataMap = 3,
+			Fields = 4,
+			ProcessType = 5,
 		}
 
 		#endregion
@@ -58,7 +59,7 @@ namespace ModuleSystem.Editor
 				_moduleProcessorTreeView.Reload();
 
 				// Refresh Update Logics
-				if(_state.IsRefreshed)
+				if (_state.IsRefreshed)
 				{
 					_moduleProcessorTreeView.multiColumnHeader.ResizeToFit();
 					_state.IsRefreshed = false;
@@ -71,7 +72,7 @@ namespace ModuleSystem.Editor
 		{
 			if (_moduleProcessorTreeView == null)
 			{
-				if(_state == null)
+				if (_state == null)
 				{
 					_state = new ModuleProcessorViewState();
 				}
@@ -79,6 +80,7 @@ namespace ModuleSystem.Editor
 				_moduleProcessorTreeView = new ModuleProcessorView(_state);
 				EditorSceneManager.sceneLoaded += OnSceneLoaded;
 				_state.RefreshTarget();
+				_state.IsRefreshed = true;
 			}
 		}
 
@@ -108,37 +110,11 @@ namespace ModuleSystem.Editor
 				_moduleProcessorTreeView = new ModuleProcessorView(_state);
 			}
 
-			UnityEngine.Object activeObject = Selection.activeObject;
-
-			GameObject potentialTarget = _state.TargetContainer;
-
-			if (activeObject != null)
-			{
-				if (activeObject is GameObject gameObject)
-				{
-					potentialTarget = gameObject;
-				}
-			}
-
-			if (!_state.HasTarget)
-			{
-				_state.SetTargetContainer(potentialTarget, false);
-			}
-
-			if (!_state.HasTarget)
-			{
-				IHaveModuleProcessor[] processors = FindObjectsOfType<MonoBehaviour>().OfType<IHaveModuleProcessor>().ToArray();
-				if (processors.Length > 0)
-				{
-					_state.SetTargetContainer(((MonoBehaviour)processors[0]).gameObject, false);
-				}
-			}
-
 			if (_state.HasTarget)
 			{
-				if (_state.TargetContainer != null)
+				if (_state.TargetStackProcessedEvent != null)
 				{
-					titleContent.text = $"Processor: {_state.TargetContainer.name}";
+					titleContent.text = $"Processor: {_state.TargetStackProcessedEvent.name}";
 				}
 				else
 				{
@@ -148,7 +124,7 @@ namespace ModuleSystem.Editor
 			else
 			{
 				titleContent.text = "No Processor";
-				EditorGUILayout.LabelField($"No Active {nameof(IHaveModuleProcessor)} Selected");
+				EditorGUILayout.LabelField($"No Active {nameof(ActionStackProcessedEvent)} Selected");
 			}
 		}
 
@@ -166,13 +142,13 @@ namespace ModuleSystem.Editor
 			{
 				RefreshTarget();
 
-				GameObject go = _state.TargetContainer;
+				ActionStackProcessedEvent targetStackEvent = _state.TargetStackProcessedEvent;
 
-				go = EditorGUILayout.ObjectField("Target: ", go, typeof(GameObject), true) as GameObject;
+				targetStackEvent = EditorGUILayout.ObjectField("Target: ", targetStackEvent, typeof(ActionStackProcessedEvent), true) as ActionStackProcessedEvent;
 
-				if (go != _state.TargetContainer)
+				if (targetStackEvent != _state.TargetStackProcessedEvent)
 				{
-					_state.SetTargetContainer(go, false);
+					_state.SetTargetContainer(targetStackEvent, false);
 				}
 
 				if (_state.HasTarget)
@@ -190,15 +166,13 @@ namespace ModuleSystem.Editor
 		private class ModuleProcessorViewState : TreeViewState
 		{
 			[SerializeField]
-			private GameObject _targetContainer;
+			private ActionStackProcessedEvent _stackProcessedEvent;
 
 			private List<ModuleActionData> _collectedCoreActions = new List<ModuleActionData>();
 
-			public GameObject TargetContainer => _targetContainer;
+			public ActionStackProcessedEvent TargetStackProcessedEvent => _stackProcessedEvent;
 
-			public bool HasTarget => Target != null;
-
-			public IHaveModuleProcessor Target => _targetContainer != null ? _targetContainer.GetComponent<IHaveModuleProcessor>() : null;
+			public bool HasTarget => _stackProcessedEvent != null;
 
 			public bool IsRefreshed = false;
 
@@ -216,33 +190,33 @@ namespace ModuleSystem.Editor
 
 			public void RefreshTarget()
 			{
-				SetTargetContainer(_targetContainer, true);
+				SetTargetContainer(_stackProcessedEvent, true);
 			}
 
-			public void SetTargetContainer(GameObject targetContainer, bool force)
+			public void SetTargetContainer(ActionStackProcessedEvent target, bool force)
 			{
-				bool hasChange = _targetContainer != targetContainer;
-				if(targetContainer == null || hasChange || force)
+				bool hasChange = _stackProcessedEvent != target;
+				if (target == null || hasChange || force)
 				{
-					if(Target != null)
+					if (_stackProcessedEvent != null)
 					{
-						Target.ActionStackProcessedEvent.RemoveListener(OnActionStackProcessedEvent);
+						_stackProcessedEvent.RemoveListener(OnActionStackProcessedEvent);
 					}
 
-					if(!force)
+					if (!force)
 					{
 						GetCollectedCoreActionsList().Clear();
 					}
 
-					_targetContainer = targetContainer;
+					_stackProcessedEvent = target;
 
-					if (Target != null)
+					if (_stackProcessedEvent != null)
 					{
-						Target.ActionStackProcessedEvent.AddListener(OnActionStackProcessedEvent);
+						_stackProcessedEvent.AddListener(OnActionStackProcessedEvent);
 					}
 				}
-				
-				if(hasChange)
+
+				if (hasChange)
 				{
 					IsRefreshed = true;
 				}
@@ -250,7 +224,7 @@ namespace ModuleSystem.Editor
 
 			private List<ModuleActionData> GetCollectedCoreActionsList()
 			{
-				if(_collectedCoreActions == null)
+				if (_collectedCoreActions == null)
 				{
 					_collectedCoreActions = new List<ModuleActionData>();
 				}
@@ -258,7 +232,7 @@ namespace ModuleSystem.Editor
 				return _collectedCoreActions;
 			}
 
-			private void OnActionStackProcessedEvent(ModuleAction coreAction, string layer)
+			private void OnActionStackProcessedEvent(ModuleAction coreAction)
 			{
 				Queue<(ModuleAction, ModuleActionData)> nextToConvert = new Queue<(ModuleAction, ModuleActionData)>();
 				ModuleActionData coreActionData = new ModuleActionData();
@@ -270,17 +244,39 @@ namespace ModuleSystem.Editor
 					(ModuleAction convertingAction, ModuleActionData convertingData) = nextToConvert.Dequeue();
 					List<string> options = new List<string>();
 
+					// Processing
+					options.Add("~Processing~");
+					options.Add("-- Chained By Processors -- ");
+					options.AddRange(convertingAction.GetChainedByProcessorsList());
+					options.Add("-- Processed By Modules -- ");
+					options.AddRange(convertingAction.GetProcessedByModulesList());
+
+
+					string[] processingOptions = options.ToArray(); ;
+					options.Clear();
+
+					// DataMap
+					options.Add("~DataMap~");
+					options.Add("-- Tags -- ");
+					options.AddRange(convertingAction.DataMap.GetTags());
+
 					options.Add("-- Marks -- ");
-					foreach (var pair in convertingAction.DataMap.GetMarks())
+
+					string[] markKeys = convertingAction.DataMap.GetMarkKeys();
+
+					for (int i = 0; i < markKeys.Length; i++)
 					{
-						foreach (var markSuffix in pair.Value)
+						if (convertingAction.DataMap.TryGetMarkSuffixes(markKeys[i], out string[] suffixes))
 						{
-							options.Add(string.Format("{0}-{1}", pair.Key, markSuffix));
+							for (int j = 0; j < suffixes.Length; j++)
+							{
+								options.Add(string.Format("{0}-{1}", markKeys[i], suffixes[j]));
+							}
 						}
 					}
 
 					options.Add("-- Data --");
-					foreach (var pair in convertingAction.DataMap.GetDataMap())
+					foreach (var pair in convertingAction.DataMap.GetDataMapInternal())
 					{
 						options.Add(string.Format("{0}: {1}", pair.Key, pair.Value));
 					}
@@ -289,8 +285,9 @@ namespace ModuleSystem.Editor
 
 					options.Clear();
 
+					// Fields
 					FieldInfo[] infos = convertingAction.GetType().GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-					options.Add("-- Fields --");
+					options.Add("~Fields~");
 					for (int j = 0; j < infos.Length; j++)
 					{
 						FieldInfo info = infos[j];
@@ -305,11 +302,12 @@ namespace ModuleSystem.Editor
 					convertingData.UniqueIdentifierString = convertingAction.UniqueIdentifier;
 					convertingData.DataMapOptions = dataMapOptions;
 					convertingData.FieldOptions = fieldsOptions;
+					convertingData.ProcessingOptions = processingOptions;
 
 					// Chained Actions
-					ModuleAction[] chainedActions = convertingAction.ChainedActions;
-					ModuleActionData[] chainedActionsData = new ModuleActionData[chainedActions.Length];
-					for (int i = 0; i < chainedActions.Length; i++)
+					IReadOnlyList<ModuleAction> chainedActions = convertingAction.ChainedActions;
+					ModuleActionData[] chainedActionsData = new ModuleActionData[chainedActions.Count];
+					for (int i = 0, c = chainedActionsData.Length; i < c; i++)
 					{
 						ModuleActionData actionData = new ModuleActionData();
 						nextToConvert.Enqueue((chainedActions[i], actionData));
@@ -317,18 +315,6 @@ namespace ModuleSystem.Editor
 						actionData.ProcessTypeString = "Chained";
 					}
 					convertingData.ChainedActionsData = chainedActionsData;
-
-					// Enqueued Actions
-					ModuleAction[] enqueuedActions = convertingAction.EnqueuedActions;
-					ModuleActionData[] enqueuedActionsData = new ModuleActionData[enqueuedActions.Length];
-					for (int i = 0; i < enqueuedActions.Length; i++)
-					{
-						ModuleActionData actionData = new ModuleActionData();
-						nextToConvert.Enqueue((enqueuedActions[i], actionData));
-						enqueuedActionsData[i] = actionData;
-						actionData.ProcessTypeString = "Enqueued";
-					}
-					convertingData.EnqueuedActionsData = enqueuedActionsData;
 				}
 
 				GetCollectedCoreActionsList().Add(coreActionData);
@@ -345,9 +331,9 @@ namespace ModuleSystem.Editor
 				public string UniqueIdentifierString;
 				public string[] DataMapOptions;
 				public string[] FieldOptions;
+				public string[] ProcessingOptions;
 				public string ProcessTypeString;
 				public ModuleActionData[] ChainedActionsData;
-				public ModuleActionData[] EnqueuedActionsData;
 			}
 
 			#endregion
@@ -415,6 +401,9 @@ namespace ModuleSystem.Editor
 							case Headers.Id:
 								args.label = action.UniqueIdentifierString;
 								break;
+							case Headers.Processing:
+								EditorGUI.Popup(cellRect, 0, action.ProcessingOptions);
+								continue;
 							case Headers.DataMap:
 								EditorGUI.Popup(cellRect, 0, action.DataMapOptions);
 								continue;
@@ -487,12 +476,6 @@ namespace ModuleSystem.Editor
 					for (int i = 0; i < chainedChildren.Length; i++)
 					{
 						AddTreeItem(treeItem, chainedChildren[i]);
-					}
-
-					ModuleProcessorViewState.ModuleActionData[] enqueuedChildren = moduleAction.EnqueuedActionsData;
-					for (int i = 0; i < enqueuedChildren.Length; i++)
-					{
-						AddTreeItem(treeItem, enqueuedChildren[i]);
 					}
 				}
 

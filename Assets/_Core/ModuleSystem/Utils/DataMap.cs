@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 
 namespace ModuleSystem
 {
@@ -10,19 +10,41 @@ namespace ModuleSystem
 
 		private readonly Dictionary<string, object> _dataMap = new Dictionary<string, object>();
 		private readonly Dictionary<string, List<string>> _marks = new Dictionary<string, List<string>>();
+		private readonly List<string> _tags = new List<string>();
 
 		#endregion
 
 		#region Public Methods
 
+		public void Tag(string key, string suffix = "")
+		{
+			string tag = string.Concat(key, ")", suffix);
+			if (!_tags.Contains(tag))
+			{
+				_tags.Add(tag);
+			}
+		}
+
+		public bool HasTag(string key, string suffix = "")
+		{
+			string tag = string.Concat(key, ")", suffix);
+			return _tags.Contains(tag);
+		}
+
+		public bool RemoveTag(string key, string suffix = "")
+		{
+			string tag = string.Concat(key, ")", suffix);
+			return _tags.Remove(tag);
+		}
+
 		public void Mark(string key, string suffix = "Default")
 		{
-			if(!_marks.TryGetValue(key, out List<string> values))
+			if (!_marks.TryGetValue(key, out List<string> values))
 			{
 				_marks[key] = values = new List<string>();
 			}
-			
-			if(!string.IsNullOrEmpty(suffix) && !values.Contains(suffix))
+
+			if (!string.IsNullOrEmpty(suffix) && !values.Contains(suffix))
 			{
 				values.Add(suffix);
 			}
@@ -30,7 +52,7 @@ namespace ModuleSystem
 
 		public bool HasMark(string key, string suffix = "")
 		{
-			if(_marks.TryGetValue(key, out List<string> values))
+			if (_marks.TryGetValue(key, out List<string> values))
 			{
 				return string.IsNullOrEmpty(suffix) || values.Contains(suffix);
 			}
@@ -39,7 +61,7 @@ namespace ModuleSystem
 
 		public bool HasMarkSuffix(string key, string suffix)
 		{
-			if(TryGetMarkSuffixes(key, out string[] suffixes))
+			if (TryGetMarkSuffixes(key, out string[] suffixes))
 			{
 				return Array.IndexOf(suffixes, suffix) >= 0;
 			}
@@ -48,7 +70,7 @@ namespace ModuleSystem
 
 		public bool TryGetMarkSuffixes(string key, out string[] suffixes)
 		{
-			if(_marks.TryGetValue(key, out List<string> results))
+			if (_marks.TryGetValue(key, out List<string> results))
 			{
 				suffixes = results.ToArray();
 				return true;
@@ -59,7 +81,7 @@ namespace ModuleSystem
 
 		public void RemoveMark(string key, string suffix = null)
 		{
-			if(_marks.TryGetValue(key, out List<string> values))
+			if (_marks.TryGetValue(key, out List<string> values))
 			{
 				if (string.IsNullOrEmpty(suffix))
 				{
@@ -111,24 +133,25 @@ namespace ModuleSystem
 			return _dataMap.ContainsKey(key);
 		}
 
-		public void Dispose()
+		public string[] GetMarkKeys()
 		{
-			_dataMap.Clear();
-			_marks.Clear();
+			return _marks.Keys.ToArray();
 		}
 
-		#endregion
+		public string[] GetTags()
+		{
+			return _tags.ToArray();
+		}
 
-		#region Internal Methods
-
-		internal Dictionary<string, object> GetDataMap()
+		public IDictionary<string, object> GetDataMapInternal()
 		{
 			return _dataMap;
 		}
 
-		internal Dictionary<string, List<string>> GetMarks()
+		public void Dispose()
 		{
-			return _marks;
+			_dataMap.Clear();
+			_marks.Clear();
 		}
 
 		#endregion
