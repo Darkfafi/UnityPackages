@@ -6,9 +6,9 @@ namespace ModuleSystem
 {
 	public abstract class DelayedModuleBehaviourBase : ModuleBehaviourBase
 	{
-		public override bool TryProcess(ModuleAction action, Action unlockAction)
+		public override bool TryProcess(ModuleAction action, Action unlockMethod)
 		{
-			return TryProcessInternal(action, unlockAction);
+			return TryProcessInternal(action, unlockMethod);
 		}
 
 		protected abstract bool TryProcessInternal(ModuleAction action, Action unlockMethod);
@@ -16,11 +16,11 @@ namespace ModuleSystem
 
 	public abstract class BasicModuleBehaviourBase : ModuleBehaviourBase
 	{
-		public override bool TryProcess(ModuleAction action, Action unlockAction)
+		public override bool TryProcess(ModuleAction action, Action unlockMethod)
 		{
 			if (TryProcessInternal(action))
 			{
-				unlockAction();
+				unlockMethod();
 				return true;
 			}
 			return false;
@@ -41,7 +41,25 @@ namespace ModuleSystem.Core
 			get; private set;
 		}
 
-		public string UniqueIdentifier => string.Concat("ModuleBehaviour-UUID:", GetInstanceID());
+#if UNITY_EDITOR
+		public string UniqueIdentifier
+		{
+			get
+			{
+				if (string.IsNullOrEmpty(_uniqueIdentifierCached))
+				{
+					_uniqueIdentifierCached = string.Concat($" [{GetType().Name}]: ModuleBehaviour-UUID:", GetHashCode());
+				}
+				return _uniqueIdentifierCached;
+			}
+		}
+		private string _uniqueIdentifierCached = null;
+#else
+		public string UniqueIdentifier => GetHashCode().ToString();
+#endif
+
+		public bool IsLocking => Processor != null && Processor.IsLockingModule(this);
+
 
 		#endregion
 
@@ -60,6 +78,9 @@ namespace ModuleSystem.Core
 		public virtual void Deinit()
 		{
 			Processor = null;
+#if UNITY_EDITOR
+			_uniqueIdentifierCached = null;
+#endif
 		}
 
 		public virtual void OnResolvedStack(ModuleAction coreAction)
@@ -67,7 +88,7 @@ namespace ModuleSystem.Core
 
 		}
 
-		public abstract bool TryProcess(ModuleAction action, Action unlockAction);
+		public abstract bool TryProcess(ModuleAction action, Action unlockMethod);
 
 		#endregion
 	}
