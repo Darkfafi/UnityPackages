@@ -212,7 +212,7 @@ namespace ModuleSystem
 						// Processing Callback
 						if (action is CallbackModuleAction callbackModule && callbackModule.ModuleSource.UniqueIdentifier == module.UniqueIdentifier)
 						{
-							callbackModule.MarkProcessedByModule(module);
+							callbackModule.TryMarkProcessedByModule(module);
 							callbackModule?.ModuleCallback(callbackModule);
 							break;
 						}
@@ -222,7 +222,7 @@ namespace ModuleSystem
 							Unlock(module);
 						}))
 						{
-							action.MarkProcessedByModule(module);
+							action.TryMarkProcessedByModule(module);
 							if (_lockingModule != null)
 							{
 								_isProcessing = false;
@@ -293,10 +293,9 @@ namespace ModuleSystem
 			for (int i = source.ChainedActions.Count - 1; i >= 0; i--)
 			{
 				ModuleAction chainedAction = source.ChainedActions[i];
-				if (!chainedAction.IsChainedByProcessor(this))
+				if (chainedAction.TryMarkChainedByProcessor(this))
 				{
 					_executionStack.Push(chainedAction);
-					chainedAction.MarkChainedByProcessor(this);
 				}
 			}
 		}

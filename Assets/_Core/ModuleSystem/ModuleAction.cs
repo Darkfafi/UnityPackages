@@ -218,12 +218,9 @@ namespace ModuleSystem
 			return _processedByModulesList.Contains(module.UniqueIdentifier);
 		}
 
-		internal void MarkProcessedByModule(IModule module)
+		internal bool TryMarkProcessedByModule(IModule module)
 		{
-			if (!IsProcessedByModule(module))
-			{
-				_processedByModulesList.Add(module.UniqueIdentifier);
-			}
+			return _processedByModulesList.Add(module.UniqueIdentifier);
 		}
 
 		internal bool IsChainedByProcessor(ModuleProcessor processor)
@@ -231,12 +228,9 @@ namespace ModuleSystem
 			return _chainedByProcessorList.Contains(processor.UniqueIdentifier);
 		}
 
-		internal void MarkChainedByProcessor(ModuleProcessor processor)
+		internal bool TryMarkChainedByProcessor(ModuleProcessor processor)
 		{
-			if (!IsChainedByProcessor(processor))
-			{
-				_chainedByProcessorList.Add(processor.UniqueIdentifier);
-			}
+			return _chainedByProcessorList.Add(processor.UniqueIdentifier);
 		}
 
 
