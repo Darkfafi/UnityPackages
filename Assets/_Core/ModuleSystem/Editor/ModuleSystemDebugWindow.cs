@@ -305,9 +305,9 @@ namespace ModuleSystem.Editor
 					convertingData.ProcessingOptions = processingOptions;
 
 					// Chained Actions
-					ModuleAction[] chainedActions = convertingAction.ChainedActions;
-					ModuleActionData[] chainedActionsData = new ModuleActionData[chainedActions.Length];
-					for (int i = 0; i < chainedActions.Length; i++)
+					IReadOnlyList<ModuleAction> chainedActions = convertingAction.ChainedActions;
+					ModuleActionData[] chainedActionsData = new ModuleActionData[chainedActions.Count];
+					for (int i = 0, c = chainedActionsData.Length; i < c; i++)
 					{
 						ModuleActionData actionData = new ModuleActionData();
 						nextToConvert.Enqueue((chainedActions[i], actionData));

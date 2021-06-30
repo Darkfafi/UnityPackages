@@ -32,7 +32,7 @@ namespace ModuleSystem
 			get; private set;
 		}
 
-		public ModuleAction[] ChainedActions => _chainedActions.ToArray();
+		public IReadOnlyList<ModuleAction> ChainedActions => _chainedActions;
 
 		#endregion
 
@@ -122,7 +122,7 @@ namespace ModuleSystem
 			where T : ModuleAction
 		{
 			List<T> results = new List<T>();
-			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(ChainedActions);
+			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(_chainedActions);
 			predicate = predicate ?? new Predicate<T>(x => true);
 			for (int i = 0; i < _chainedActions.Count; i++)
 			{
@@ -141,7 +141,7 @@ namespace ModuleSystem
 
 		public bool TryFindDownwards<T>(Predicate<T> predicate, Predicate<ModuleAction> chainBlockade, bool inclSelf, out T result)
 		{
-			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(ChainedActions);
+			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(_chainedActions);
 			predicate = predicate ?? new Predicate<T>(x => true);
 			chainBlockade = chainBlockade ?? new Predicate<ModuleAction>(x => false);
 
@@ -162,9 +162,9 @@ namespace ModuleSystem
 
 				if (!chainBlockade(action))
 				{
-					for (int i = 0, c = action.ChainedActions.Length; i < c; i++)
+					for (int i = 0, c = action._chainedActions.Count; i < c; i++)
 					{
-						chainedActions.Enqueue(action.ChainedActions[i]);
+						chainedActions.Enqueue(action._chainedActions[i]);
 					}
 				}
 			}
@@ -176,7 +176,7 @@ namespace ModuleSystem
 			where T : ModuleAction
 		{
 			List<T> results = new List<T>();
-			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(ChainedActions);
+			Queue<ModuleAction> chainedActions = new Queue<ModuleAction>(_chainedActions);
 			predicate = predicate ?? new Predicate<T>(x => true);
 			chainBlockade = chainBlockade ?? new Predicate<ModuleAction>(x => false);
 
@@ -190,9 +190,9 @@ namespace ModuleSystem
 
 				if (!chainBlockade(action))
 				{
-					for (int i = 0, c = action.ChainedActions.Length; i < c; i++)
+					for (int i = 0, c = action._chainedActions.Count; i < c; i++)
 					{
-						chainedActions.Enqueue(action.ChainedActions[i]);
+						chainedActions.Enqueue(action._chainedActions[i]);
 					}
 				}
 			}

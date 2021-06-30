@@ -38,12 +38,11 @@ public class Test : MonoBehaviour
 			}),
 			new BasicLambdaModule<RemoveAction>((action, processor) =>
 			{
-				Debug.Log("Removed Tile");
 				return true;
 			})
 		});
 
-		for (int i = 0; i < 6; i++)
+		for (int i = 0; i < 100; i++)
 		{
 			Processor.EnqueueAction(new MatchAction() { Iteration = i });
 		}

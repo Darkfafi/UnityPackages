@@ -290,7 +290,7 @@ namespace ModuleSystem
 		private void ChainActions(ModuleAction source)
 		{
 			// Stack Chain Actions after source is processed completely
-			for (int i = source.ChainedActions.Length - 1; i >= 0; i--)
+			for (int i = source.ChainedActions.Count - 1; i >= 0; i--)
 			{
 				ModuleAction chainedAction = source.ChainedActions[i];
 				if (!chainedAction.IsChainedByProcessor(this))
