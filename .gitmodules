@@ -1,0 +1,3 @@
+[submodule "Packages/ModuleSystem_UnityPackage"]
+	path = Packages/ModuleSystem_UnityPackage
+	url = https://github.com/Darkfafi/ModuleSystem_UnityPackage.git
