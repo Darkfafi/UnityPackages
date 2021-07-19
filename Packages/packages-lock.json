@@ -147,6 +147,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "rasofiagames.nodesystem": {
+      "version": "file:NodeSystem_UnityPackage",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.unity.modules.ai": {
       "version": "1.0.0",
       "depth": 0,

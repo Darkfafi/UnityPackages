@@ -1,3 +1,6 @@
 [submodule "Packages/ModuleSystem_UnityPackage"]
 	path = Packages/ModuleSystem_UnityPackage
 	url = https://github.com/Darkfafi/ModuleSystem_UnityPackage.git
+[submodule "Packages/NodeSystem_UnityPackage"]
+	path = Packages/NodeSystem_UnityPackage
+	url = https://github.com/Darkfafi/NodeSystem_UnityPackage.git
