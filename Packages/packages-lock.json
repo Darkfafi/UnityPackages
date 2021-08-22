@@ -147,6 +147,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "rasofiagames.nestedsocollection": {
+      "version": "file:NestedSOCollection_UnityPackage",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "rasofiagames.nodesystem": {
       "version": "file:NodeSystem_UnityPackage",
       "depth": 0,

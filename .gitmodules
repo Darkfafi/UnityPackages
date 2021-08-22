@@ -4,3 +4,6 @@
 [submodule "Packages/NodeSystem_UnityPackage"]
 	path = Packages/NodeSystem_UnityPackage
 	url = https://github.com/Darkfafi/NodeSystem_UnityPackage.git
+[submodule "Packages/NestedSOCollection_UnityPackage"]
+	path = Packages/NestedSOCollection_UnityPackage
+	url = https://github.com/Darkfafi/NestedSOCollection_UnityPackage.git
