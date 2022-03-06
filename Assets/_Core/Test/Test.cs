@@ -24,25 +24,26 @@ public class Test : MonoBehaviour
 				{
 					action.ChainAction(new MatchAction());
 				}
-
-				for(int i = 0; i < action.Iteration * 2; i++)
-				{
-					action.ChainAction(new HitAction());
-				}
+				action.ChainAction(new HitAction());
 				return true;
 			}),
 			new BasicLambdaModule<HitAction>((action, processor) =>
 			{
-				action.ChainAction(new RemoveAction());
-				return true;
-			}),
+				if(action.ReactionCount < 5)
+				{
+					action.ReactionCount = action.ReactionCount + 1;
+					action.ChainAction(new RemoveAction());
+					return true;
+				}
+				return false;
+			}, true),
 			new BasicLambdaModule<RemoveAction>((action, processor) =>
 			{
 				return true;
 			})
 		});
 
-		for (int i = 0; i < 100; i++)
+		for (int i = 0; i < 1; i++)
 		{
 			Processor.EnqueueAction(new MatchAction() { Iteration = i });
 		}
@@ -65,7 +66,7 @@ public class Test : MonoBehaviour
 		}
 	}
 
-	private void OnActionStackProcessedEvent(ModuleAction moduleAction)
+	private void OnActionStackProcessedEvent(ModuleAction moduleAction, ModuleProcessor processor)
 	{
 		ActionStackProcessedEvent.Emit(moduleAction);
 	}
@@ -77,7 +78,7 @@ public class Test : MonoBehaviour
 
 	public class HitAction : ModuleAction
 	{
-
+		public int ReactionCount = 0;
 	}
 
 	public class RemoveAction : ModuleAction
