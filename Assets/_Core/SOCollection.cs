@@ -4,7 +4,7 @@ using UnityEngine;
 using NestedSO;
 
 [CreateAssetMenu()]
-public class SOCollection : NestedSOCollectionBase<SOCollectionItem>
+public class SOCollection : NestedSOCollectionBase<SOCollectionElement>
 {
 
 }

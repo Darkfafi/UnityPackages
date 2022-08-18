@@ -7,3 +7,6 @@
 [submodule "Packages/NestedSOCollection_UnityPackage"]
 	path = Packages/NestedSOCollection_UnityPackage
 	url = https://github.com/Darkfafi/NestedSOCollection_UnityPackage.git
+[submodule "Packages/RaTweening_UnityPackage"]
+	path = Packages/RaTweening_UnityPackage
+	url = https://github.com/Darkfafi/RaTweening_UnityPackage
